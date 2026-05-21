@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WHS Team Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f3f4f6; color: #1f2937; min-height: 100vh; }
+
+  #loadingScreen {
+    position: fixed; inset: 0; background: #1a3c5e;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: white; z-index: 999;
+  }
+  #loadingScreen h2 { font-size: 20px; margin-bottom: 12px; }
+  #loadingScreen p { font-size: 14px; opacity: 0.75; }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  header { background: #1a3c5e; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header span { font-size: 13px; opacity: 0.75; }
+
+  .tabs { display: flex; background: #fff; border-bottom: 2px solid #e5e7eb; padding: 0 24px; }
+  .tab { padding: 12px 20px; cursor: pointer; font-size: 14px; font-weight: 500; border-bottom: 3px solid transparent; margin-bottom: -2px; color: #6b7280; transition: all 0.15s; }
+  .tab.active { border-bottom-color: #1a3c5e; color: #1a3c5e; }
+  .tab:hover:not(.active) { color: #374151; }
+  .badge { background: #ef4444; color: white; border-radius: 9999px; font-size: 11px; padding: 1px 6px; margin-left: 6px; }
+
+  .content { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+  .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+
+  .member-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-top: 4px solid #e5e7eb; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+  .member-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .member-card.Office { border-top-color: #10b981; }
+  .member-card.WFH { border-top-color: #3b82f6; }
+  .member-card.Leave { border-top-color: #f59e0b; }
+  .member-card.Travelling { border-top-color: #8b5cf6; }
+
+  .member-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white; margin-bottom: 12px; }
+  .member-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .member-role { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+
+  .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+  .status-badge.Office { background: #d1fae5; color: #065f46; }
+  .status-badge.WFH { background: #dbeafe; color: #1e40af; }
+  .status-badge.Leave { background: #fef3c7; color: #92400e; }
+  .status-badge.Travelling { background: #ede9fe; color: #5b21b6; }
+
+  .member-note { font-size: 12px; color: #9ca3af; margin-top: 8px; font-style: italic; }
+
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .calendar-header h2 { font-size: 16px; font-weight: 600; }
+  .nav-btn { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 14px; color: #374151; }
+  .nav-btn:hover { background: #f9fafb; }
+
+  .calendar-grid { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .cal-head { display: grid; grid-template-columns: 140px repeat(5, 1fr); background: #1a3c5e; color: white; }
+  .cal-head-cell { padding: 12px 8px; font-size: 13px; font-weight: 600; text-align: center; border-right: 1px solid rgba(255,255,255,0.1); }
+  .cal-head-cell:first-child { text-align: left; padding-left: 16px; }
+  .cal-row { display: grid; grid-template-columns: 140px repeat(5, 1fr); border-bottom: 1px solid #f3f4f6; }
+  .cal-row:last-child { border-bottom: none; }
+  .cal-name { padding: 12px 16px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; border-right: 1px solid #f3f4f6; }
+  .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cal-cell { padding: 8px; text-align: center; border-right: 1px solid #f3f4f6; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .cal-cell:hover { background: #f9fafb; }
+  .cal-pill { padding: 3px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .cal-pill.Office { background: #d1fae5; color: #065f46; }
+  .cal-pill.WFH { background: #dbeafe; color: #1e40af; }
+  .cal-pill.Leave { background: #fef3c7; color: #92400e; }
+  .cal-pill.Travelling { background: #ede9fe; color: #5b21b6; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 28px; width: 440px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #374151; }
+  .form-group select, .form-group input, .form-group textarea { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; }
+  .form-group select:focus, .form-group input:focus, .form-group textarea:focus { border-color: #1a3c5e; box-shadow: 0 0 0 2px rgba(26,60,94,0.15); }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+
+  .status-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .status-option { border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px; cursor: pointer; text-align: center; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+  .status-option:hover { border-color: #9ca3af; }
+  .status-option.selected.Office { border-color: #10b981; background: #d1fae5; color: #065f46; }
+  .status-option.selected.WFH { border-color: #3b82f6; background: #dbeafe; color: #1e40af; }
+  .status-option.selected.Leave { border-color: #f59e0b; background: #fef3c7; color: #92400e; }
+  .status-option.selected.Travelling { border-color: #8b5cf6; background: #ede9fe; color: #5b21b6; }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn { padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: #1a3c5e; color: white; }
+  .btn-primary:hover { background: #15304d; }
+  .btn-secondary { background: #f3f4f6; color: #374151; }
+  .btn-secondary:hover { background: #e5e7eb; }
+  .btn-danger { background: #ef4444; color: white; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-success { background: #10b981; color: white; }
+  .btn-success:hover { background: #059669; }
+
+  .request-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 12px; border-left: 4px solid #e5e7eb; }
+  .request-card.pending { border-left-color: #f59e0b; }
+  .request-card.approved { border-left-color: #10b981; }
+  .request-card.rejected { border-left-color: #ef4444; }
+  .request-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .request-title { font-weight: 600; font-size: 15px; }
+  .request-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .request-status { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 9999px; }
+  .request-status.pending { background: #fef3c7; color: #92400e; }
+  .request-status.approved { background: #d1fae5; color: #065f46; }
+  .request-status.rejected { background: #fee2e2; color: #991b1b; }
+  .request-details { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .request-actions { display: flex; gap: 8px; }
+
+  .empty-state { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #1f2937; display: flex; align-items: center; gap: 8px; }
+  .today-date { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+
+  .who-view-bar { background: white; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); font-size: 13px; }
+  .who-view-bar label { font-weight: 600; color: #374151; }
+  .who-view-bar select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; cursor: pointer; }
+
+  .sync-indicator { font-size: 11px; color: #9ca3af; margin-left: auto; display: flex; align-items: center; gap: 4px; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+  .sync-dot.syncing { background: #f59e0b; animation: pulse 1s infinite; }
+  .sync-dot.error { background: #ef4444; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+</head>
+<body>
+
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <h2>WHS Team Tracker</h2>
+  <p>Loading team data...</p>
+</div>
+
+<header>
+  <h1>WHS Team Tracker</h1>
+  <span id="headerDate"></span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('status')">Team Status</div>
+  <div class="tab" onclick="showTab('calendar')">Calendar</div>
+  <div class="tab" onclick="showTab('travel')">Travel Requests <span class="badge" id="pendingBadge" style="display:none">0</span></div>
+</div>
+
+<div class="content">
+
+  <div id="tab-status">
+    <div class="today-date" id="todayDate"></div>
+    <div class="who-view-bar">
+      <label>Viewing as:</label>
+      <select id="viewingAs" onchange="onViewingAsChange()">
+        <option value="">Select your name</option>
+      </select>
+      <div class="sync-indicator"><div class="sync-dot" id="syncDot"></div><span id="syncLabel">Synced</span></div>
+    </div>
+    <div class="section-title">Today's Status</div>
+    <div class="team-grid" id="teamGrid"></div>
+  </div>
+
+  <div id="tab-calendar" style="display:none">
+    <div class="calendar-header">
+      <button class="nav-btn" onclick="changeWeek(-1)">&#8592; Prev</button>
+      <h2 id="calWeekLabel"></h2>
+      <button class="nav-btn" onclick="changeWeek(1)">Next &#8594;</button>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </div>
+
+  <div id="tab-travel" style="display:none">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div class="section-title" style="margin:0">Travel Requests</div>
+      <button class="btn btn-primary" onclick="openTravelModal()">+ Request Travel</button>
+    </div>
+    <div id="pendingSection">
+      <div class="section-title" style="font-size:13px; color:#92400e;">Pending Approval</div>
+      <div id="pendingList"></div>
+    </div>
+    <div id="historySection" style="margin-top:24px;">
+      <div class="section-title" style="font-size:13px; color:#6b7280;">History</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- STATUS MODAL -->
+<div class="modal-overlay" id="statusModal">
+  <div class="modal">
+    <h2 id="statusModalTitle">Update Status</h2>
+    <div class="form-group">
+      <label>Status</label>
+      <div class="status-options">
+        <div class="status-option" data-status="Office" onclick="selectStatus('Office')">🏢 Office</div>
+        <div class="status-option" data-status="WFH" onclick="selectStatus('WFH')">🏠 WFH</div>
+        <div class="status-option" data-status="Leave" onclick="selectStatus('Leave')">🌴 Leave</div>
+        <div class="status-option" data-status="Travelling" onclick="selectStatus('Travelling')">✈️ Travelling</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Note (optional)</label>
+      <input type="text" id="statusNote" placeholder="e.g. Back Thursday, Newcastle visit" maxlength="60">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('statusModal')">Cancel</button>
+      <button class="btn btn-danger" id="clearStatusBtn" style="display:none" onclick="clearStatus()">Clear</button>
+      <button class="btn btn-primary" onclick="saveStatus()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRAVEL MODAL -->
+<div class="modal-overlay" id="travelModal">
+  <div class="modal">
+    <h2>Request Travel</h2>
+    <div class="form-group">
+      <label>Your Name</label>
+      <select id="travelName"><option value="">Select your name</option></select>
+    </div>
+    <div class="form-group">
+      <label>Destination / Purpose</label>
+      <input type="text" id="travelDestination" placeholder="e.g. Newcastle site visit">
+    </div>
+    <div class="form-group">
+      <label>Start Date</label>
+      <input type="date" id="travelStart">
+    </div>
+    <div class="form-group">
+      <label>End Date</label>
+      <input type="date" id="travelEnd">
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="travelNotes" placeholder="Any additional context..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('travelModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitTravelRequest()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- CONFIG ----
+const API_KEY = '$2a$10$UOAfeo30j3Ovd.oo.1ahLe83LCJlaH614cZ8dUbljzvsXQTfL/dqq';
+const BIN_NAME = 'WHS-Team-Tracker';
+let BIN_ID = '6a0e6e7d6877513b27a83f39';
+
+const TEAM = [
+  { id: 'jesse',   name: 'Jesse Trimarchi', role: 'WHS Training Partner',  color: '#1a3c5e' },
+  { id: 'mark',    name: 'Mark Peagam',     role: 'National WHS Manager',   color: '#065f46' },
+  { id: 'member3', name: 'Team Member 3',   role: 'WHS Training Partner',   color: '#5b21b6' },
+  { id: 'member4', name: 'Team Member 4',   role: 'WHS Training Partner',   color: '#92400e' },
+  { id: 'member5', name: 'Team Member 5',   role: 'WHS Support',            color: '#1e40af' },
+];
+
+const APPROVER_ID = 'mark';
+const EMPTY_DATA = { statuses: {}, travelRequests: [] };
+
+let appData = JSON.parse(JSON.stringify(EMPTY_DATA));
+let currentMemberEditing = null;
+let currentDateEditing = null;
+let selectedStatus = null;
+let calWeekOffset = 0;
+let saveTimeout = null;
+
+// ---- JSONBIN API ----
+async function apiFetch(url, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': API_KEY,
+      'X-Bin-Versioning': 'false'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+  // Create new bin
+  const created = await apiFetch('https://api.jsonbin.io/v3/b', 'POST', EMPTY_DATA);
+  // Update name
+  const newId = created.metadata.id;
+  await apiFetch(`https://api.jsonbin.io/v3/b/${newId}/meta/name`, 'PUT', { name: BIN_NAME });
+  return newId;
+}
+
+async function loadRemoteData() {
+  const res = await apiFetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`);
+  return res.record;
+}
+
+async function saveRemoteData(data) {
+  await apiFetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, 'PUT', data);
+}
+
+// ---- SYNC HELPERS ----
+function setSyncState(state) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  if (!dot) return;
+  dot.className = 'sync-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+  label.textContent = state === 'syncing' ? 'Saving...' : state === 'error' ? 'Sync error' : 'Synced';
+}
+
+function scheduleSave() {
+  setSyncState('syncing');
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      await saveRemoteData(appData);
+      setSyncState('synced');
+    } catch(e) {
+      setSyncState('error');
+      console.error('Save failed', e);
+    }
+  }, 800);
+}
+
+// ---- INIT ----
+window.onload = async function() {
+  const now = new Date();
+  document.getElementById('headerDate').textContent = now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('todayDate').textContent = 'Today: ' + now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  TEAM.forEach(m => {
+    document.getElementById('viewingAs').innerHTML += `<option value="${m.id}">${m.name}</option>`;
+    document.getElementById('travelName').innerHTML += `<option value="${m.id}">${m.name}</option>`;
+  });
+
+  try {
+    console.log('Fetching from JSONBin...');
+    appData = await loadRemoteData();
+    console.log('Loaded:', appData);
+    if (!appData.statuses) appData.statuses = {};
+    if (!appData.travelRequests) appData.travelRequests = [];
+  } catch(e) {
+    console.error('Load error:', e.message, e);
+    document.getElementById('loadingScreen').innerHTML = `
+      <div style="text-align:center;padding:24px;">
+        <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+        <h2 style="margin-bottom:8px;">Could not connect</h2>
+        <p style="opacity:0.8;max-width:320px;">Could not reach JSONBin. Check your internet connection and refresh.</p>
+        <button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:white;color:#1a3c5e;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Retry</button>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('loadingScreen').style.display = 'none';
+  renderTeamGrid();
+  renderCalendar();
+  renderTravelRequests();
+
+  // Auto-refresh every 60 seconds
+  setInterval(async () => {
+    try {
+      const fresh = await loadRemoteData();
+      if (!fresh.statuses) fresh.statuses = {};
+      if (!fresh.travelRequests) fresh.travelRequests = [];
+      appData = fresh;
+      renderTeamGrid();
+      renderCalendar();
+      renderTravelRequests();
+    } catch(e) { console.warn('Refresh failed', e); }
+  }, 60000);
+};
+
+// ---- TABS ----
+function showTab(tab) {
+  ['status','calendar','travel'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    document.querySelectorAll('.tab')[['status','calendar','travel'].indexOf(t)].classList.toggle('active', t === tab);
+  });
+  if (tab === 'calendar') renderCalendar();
+  if (tab === 'travel') renderTravelRequests();
+}
+
+function onViewingAsChange() { renderTeamGrid(); }
+function getViewingAs() { return document.getElementById('viewingAs').value; }
+function today() { return new Date().toISOString().split('T')[0]; }
+function statusEmoji(s) { return { Office:'🏢', WFH:'🏠', Leave:'🌴', Travelling:'✈️' }[s] || ''; }
+
+// ---- TEAM GRID ----
+function renderTeamGrid() {
+  const todayKey = today();
+  const grid = document.getElementById('teamGrid');
+  grid.innerHTML = '';
+  const viewAs = getViewingAs();
+
+  TEAM.forEach(m => {
+    const entry = (appData.statuses[m.id] || {})[todayKey] || { status: 'Office', note: '' };
+    const card = document.createElement('div');
+    card.className = `member-card ${entry.status}`;
+    card.onclick = () => openStatusModal(m.id);
+    const initials = m.name.split(' ').map(n => n[0]).join('').slice(0,2);
+    const canEdit = viewAs === m.id;
+    card.innerHTML = `
+      <div class="member-avatar" style="background:${m.color}">${initials}</div>
+      <div class="member-name">${m.name}</div>
+      <div class="member-role">${m.role}</div>
+      <span class="status-badge ${entry.status}">${statusEmoji(entry.status)} ${entry.status}</span>
+      ${entry.note ? `<div class="member-note">${entry.note}</div>` : ''}
+      ${canEdit ? '<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Click to update</div>' : ''}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ---- STATUS MODAL ----
+function openStatusModal(memberId) {
+  openCalendarCell(memberId, today(), false);
+}
+
+function openCalendarCell(memberId, dateKey, locked) {
+  const viewAs = getViewingAs();
+  if (!viewAs) { alert("Please select your name in the 'Viewing as' bar first."); return; }
+  if (viewAs !== memberId) { alert("You can only update your own status."); return; }
+  if (locked) { alert("This date is covered by an approved travel request and cannot be changed."); return; }
+
+  currentMemberEditing = memberId;
+  currentDateEditing = dateKey;
+  const member = TEAM.find(m => m.id === memberId);
+  const d = new Date(dateKey + 'T00:00:00');
+  const label = d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.getElementById('statusModalTitle').textContent = `${member.name.split(' ')[0]} - ${label}`;
+
+  const existing = (appData.statuses[memberId] || {})[dateKey] || {};
+  document.getElementById('statusNote').value = existing.note || '';
+  selectedStatus = existing.status || 'Office';
+  document.querySelectorAll('.status-option').forEach(el => {
+    el.className = `status-option${el.dataset.status === selectedStatus ? ' selected ' + selectedStatus : ''}`;
+  });
+
+  const clearBtn = document.getElementById('clearStatusBtn');
+  clearBtn.style.display = (dateKey !== today() && existing.status) ? '' : 'none';
+  document.getElementById('statusModal').classList.add('open');
+}
+
+function selectStatus(s) {
+  selectedStatus = s;
+  document.querySelectorAll('.status-option').forEach(el => {
+    el.className = `status-option${el.dataset.status === s ? ' selected ' + s : ''}`;
+  });
+}
+
+function saveStatus() {
+  if (!selectedStatus) { alert('Please select a status.'); return; }
+  const note = document.getElementById('statusNote').value.trim();
+  if (!appData.statuses[currentMemberEditing]) appData.statuses[currentMemberEditing] = {};
+  appData.statuses[currentMemberEditing][currentDateEditing] = { status: selectedStatus, note };
+  closeModal('statusModal');
+  if (currentDateEditing === today()) renderTeamGrid();
+  renderCalendar();
+  scheduleSave();
+}
+
+function clearStatus() {
+  if (appData.statuses[currentMemberEditing]) {
+    delete appData.statuses[currentMemberEditing][currentDateEditing];
+  }
+  closeModal('statusModal');
+  renderTeamGrid();
+  renderCalendar();
+  scheduleSave();
+}
+
+// ---- CALENDAR ----
+function getWeekDates(offset) {
+  const d = new Date();
+  const day = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + (offset * 7));
+  const days = [];
+  for (let i = 0; i < 5; i++) {
+    const dd = new Date(monday);
+    dd.setDate(monday.getDate() + i);
+    days.push(dd);
+  }
+  return days;
+}
+
+function renderCalendar() {
+  const days = getWeekDates(calWeekOffset);
+  const fmt = d => d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  const keyFmt = d => d.toISOString().split('T')[0];
+  const todayKey = today();
+
+  document.getElementById('calWeekLabel').textContent =
+    `${days[0].toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} - ${days[4].toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+
+  const grid = document.getElementById('calendarGrid');
+  let html = '<div class="cal-head"><div class="cal-head-cell">Name</div>';
+  days.forEach(d => html += `<div class="cal-head-cell">${fmt(d)}</div>`);
+  html += '</div>';
+
+  TEAM.forEach(m => {
+    html += `<div class="cal-row"><div class="cal-name"><div class="cal-dot" style="background:${m.color}"></div>${m.name.split(' ')[0]}</div>`;
+    days.forEach(d => {
+      const key = keyFmt(d);
+      const isToday = key === todayKey;
+      const statusEntry = (appData.statuses[m.id] || {})[key];
+      const travel = (appData.travelRequests || []).find(r =>
+        r.memberId === m.id && r.status === 'approved' && key >= r.startDate && key <= r.endDate
+      );
+      const status = travel ? 'Travelling' : (statusEntry ? statusEntry.status : null);
+      const locked = !!travel;
+      const bg = isToday ? 'background:#f0f9ff;' : '';
+      html += `<div class="cal-cell" style="${bg}" onclick="openCalendarCell('${m.id}','${key}',${locked})">
+        ${status ? `<span class="cal-pill ${status}">${status}</span>` : '<span style="color:#d1d5db;font-size:10px;">+</span>'}
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  grid.innerHTML = html;
+}
+
+function changeWeek(dir) { calWeekOffset += dir; renderCalendar(); }
+
+// ---- TRAVEL REQUESTS ----
+function openTravelModal() {
+  const viewAs = getViewingAs();
+  if (viewAs) document.getElementById('travelName').value = viewAs;
+  ['travelStart','travelEnd','travelDestination','travelNotes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('travelModal').classList.add('open');
+}
+
+function submitTravelRequest() {
+  const memberId = document.getElementById('travelName').value;
+  const destination = document.getElementById('travelDestination').value.trim();
+  const startDate = document.getElementById('travelStart').value;
+  const endDate = document.getElementById('travelEnd').value;
+  const notes = document.getElementById('travelNotes').value.trim();
+  if (!memberId || !destination || !startDate || !endDate) { alert('Please fill in all required fields.'); return; }
+  if (endDate < startDate) { alert('End date must be after start date.'); return; }
+
+  appData.travelRequests.push({ id: Date.now().toString(), memberId, destination, startDate, endDate, notes, status: 'pending', submittedAt: new Date().toISOString() });
+  closeModal('travelModal');
+  renderTravelRequests();
+  scheduleSave();
+}
+
+function renderTravelRequests() {
+  const viewAs = getViewingAs();
+  const isApprover = viewAs === APPROVER_ID;
+  const pending = appData.travelRequests.filter(r => r.status === 'pending');
+  const history = appData.travelRequests.filter(r => r.status !== 'pending').reverse();
+  updatePendingBadge();
+
+  const pendingList = document.getElementById('pendingList');
+  pendingList.innerHTML = pending.length === 0 ? '<div class="empty-state">No pending requests.</div>' :
+    pending.map(r => {
+      const member = TEAM.find(m => m.id === r.memberId);
+      const actions = isApprover
+        ? `<div class="request-actions"><button class="btn btn-success" onclick="resolveRequest('${r.id}','approved')">Approve</button><button class="btn btn-danger" onclick="resolveRequest('${r.id}','rejected')">Reject</button></div>`
+        : '<div style="font-size:12px;color:#6b7280;">Awaiting Mark\'s approval</div>';
+      return `<div class="request-card pending">
+        <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status pending">Pending</span></div>
+        ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}${actions}</div>`;
+    }).join('');
+
+  const historyList = document.getElementById('historyList');
+  historyList.innerHTML = history.length === 0 ? '<div class="empty-state">No history yet.</div>' :
+    history.map(r => {
+      const member = TEAM.find(m => m.id === r.memberId);
+      return `<div class="request-card ${r.status}">
+        <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status ${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span></div>
+        ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}</div>`;
+    }).join('');
+}
+
+function resolveRequest(id, status) {
+  const req = appData.travelRequests.find(r => r.id === id);
+  if (req) { req.status = status; req.resolvedAt = new Date().toISOString(); }
+  renderTravelRequests();
+  if (status === 'approved') renderCalendar();
+  scheduleSave();
+}
+
+function updatePendingBadge() {
+  const count = appData.travelRequests.filter(r => r.status === 'pending').length;
+  const badge = document.getElementById('pendingBadge');
+  badge.textContent = count;
+  badge.style.display = count > 0 ? '' : 'none';
+}
+
+function fmtDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+</body>
+</html>
