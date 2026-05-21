@@ -291,13 +291,6 @@ async function apiFetch(url, method = 'GET', body = null) {
   return res.json();
 }
 
-  // Create new bin
-  const created = await apiFetch('https://api.jsonbin.io/v3/b', 'POST', EMPTY_DATA);
-  // Update name
-  const newId = created.metadata.id;
-  await apiFetch(`https://api.jsonbin.io/v3/b/${newId}/meta/name`, 'PUT', { name: BIN_NAME });
-  return newId;
-}
 
 async function loadRemoteData() {
   const res = await apiFetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`);
