@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WHS Team Status</title>
+<title>WHS Team Tracker</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', sans-serif; background: #f3f4f6; color: #1f2937; min-height: 100vh; }
@@ -139,12 +139,12 @@
 
 <div id="loadingScreen">
   <div class="spinner"></div>
-  <h2>WHS Team Status</h2>
+  <h2>WHS Team Tracker</h2>
   <p>Loading team data...</p>
 </div>
 
 <header>
-  <h1>WHS Team Status</h1>
+  <h1>WHS Team Tracker</h1>
   <span id="headerDate"></span>
 </header>
 
@@ -258,13 +258,13 @@ const BIN_NAME = 'WHS-Team-Tracker';
 let BIN_ID = '6a0e6e7d6877513b27a83f39';
 
 const TEAM = [
-  { id: 'mark',    name: 'Mark Peagam',     role: 'National WHS Manager',   color: '#065f46' },
-  { id: 'jesse',   name: 'Jesse Trimarchi', role: 'WHS Training Partner',  color: '#1a3c5e' },
-  { id: 'markr', name: 'Mark Redman',   role: 'WHS Training Partner',   color: '#5b21b6' },
-  { id: 'alex', name: 'Alex Logue',   role: 'Process Standards Coordinator',   color: '#92400e' },
-  { id: 'vacant', name: 'Vacant',   role: 'WHS Training Partner',            color: '#1e40af' },
+  { id: 'mark',   name: 'Mark Peagam',     role: 'National WHS Manager',          color: '#065f46' },
+  { id: 'jesse',  name: 'Jesse Trimarchi', role: 'WHS Training Partner',          color: '#1a3c5e' },
+  { id: 'markr',  name: 'Mark Redman',     role: 'WHS Training Partner',          color: '#5b21b6' },
+  { id: 'alex',   name: 'Alex Logue',      role: 'Process Standards Coordinator', color: '#92400e' },
+  { id: 'vacant', name: 'Vacant',          role: 'WHS Training Partner',          color: '#1e40af' },
 ];
- 
+
 const APPROVER_ID = 'mark';
 const EMPTY_DATA = { statuses: {}, travelRequests: [] };
 
@@ -384,7 +384,9 @@ function showTab(tab) {
 
 function onViewingAsChange() { renderTeamGrid(); }
 function getViewingAs() { return document.getElementById('viewingAs').value; }
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+}
 function statusEmoji(s) { return { Office:'🏢', WFH:'🏠', Leave:'🌴', Travelling:'✈️' }[s] || ''; }
 
 // ---- TEAM GRID ----
@@ -495,7 +497,7 @@ function getWeekDates(offset) {
 function renderCalendar() {
   const days = getWeekDates(calWeekOffset);
   const fmt = d => d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
-  const keyFmt = d => d.toISOString().split('T')[0];
+  const keyFmt = d => d.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
   const todayKey = today();
 
   document.getElementById('calWeekLabel').textContent =
