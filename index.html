@@ -264,7 +264,7 @@ const TEAM = [
   { id: 'alex', name: 'Alex Logue',   role: 'Process Standards Coordinator',   color: '#92400e' },
   { id: 'vacant', name: 'Vacant',   role: 'WHS Training Partner',            color: '#1e40af' },
 ];
-
+ 
 const APPROVER_ID = 'mark';
 const EMPTY_DATA = { statuses: {}, travelRequests: [] };
 
@@ -395,7 +395,13 @@ function renderTeamGrid() {
   const viewAs = getViewingAs();
 
   TEAM.forEach(m => {
-    const entry = (appData.statuses[m.id] || {})[todayKey] || { status: 'Office', note: '' };
+    // Check approved travel first, then manual status, then default
+    const travel = (appData.travelRequests || []).find(r =>
+      r.memberId === m.id && r.status === 'approved' && todayKey >= r.startDate && todayKey <= r.endDate
+    );
+    const entry = travel
+      ? { status: 'Travelling', note: travel.destination }
+      : (appData.statuses[m.id] || {})[todayKey] || { status: 'Office', note: '' };
     const card = document.createElement('div');
     card.className = `member-card ${entry.status}`;
     card.onclick = () => openStatusModal(m.id);
