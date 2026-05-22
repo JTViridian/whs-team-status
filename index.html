@@ -207,6 +207,37 @@
 
 </div>
 
+<!-- EDIT TRAVEL MODAL -->
+<div class="modal-overlay" id="editTravelModal">
+  <div class="modal">
+    <h2>Edit Travel Request</h2>
+    <div class="form-group">
+      <label>Destination</label>
+      <input type="text" id="editDestination" placeholder="e.g. Newcastle, Ingleburn">
+    </div>
+    <div class="form-group">
+      <label>Purpose</label>
+      <input type="text" id="editPurpose" placeholder="e.g. Site visit, CRV audit">
+    </div>
+    <div class="form-group">
+      <label>Start Date</label>
+      <input type="date" id="editStart">
+    </div>
+    <div class="form-group">
+      <label>End Date</label>
+      <input type="date" id="editEnd">
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="editNotes" placeholder="Any additional context..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('editTravelModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditedRequest()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- STATUS MODAL -->
 <div class="modal-overlay" id="statusModal">
   <div class="modal">
@@ -581,18 +612,29 @@ function renderTravelRequests() {
       const actions = isApprover
         ? `<div class="request-actions"><button class="btn btn-success" onclick="resolveRequest('${r.id}','approved')">Approve</button><button class="btn btn-danger" onclick="resolveRequest('${r.id}','rejected')">Reject</button></div>`
         : '<div style="font-size:12px;color:#6b7280;">Awaiting Mark\'s approval</div>';
+      const canModify = viewAs === r.memberId || isApprover;
+      const editDeleteBtns = canModify ? `
+        <div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6;">
+          <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="openEditModal('${r.id}')">Edit</button>
+          <button class="btn btn-danger" style="font-size:12px;padding:6px 12px;" onclick="deleteRequest('${r.id}')">Delete</button>
+        </div>` : '';
       return `<div class="request-card pending">
         <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${r.purpose ? r.purpose + ' &middot; ' : ''}${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status pending">Pending</span></div>
-        ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}${actions}</div>`;
+        ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}${actions}${editDeleteBtns}</div>`;
     }).join('');
 
   const historyList = document.getElementById('historyList');
   historyList.innerHTML = history.length === 0 ? '<div class="empty-state">No history yet.</div>' :
     history.map(r => {
       const member = TEAM.find(m => m.id === r.memberId);
+      const canDelete = viewAs === r.memberId || isApprover;
+      const deleteBtn = canDelete ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6;">
+          <button class="btn btn-danger" style="font-size:12px;padding:6px 12px;" onclick="deleteRequest('${r.id}')">Delete</button>
+        </div>` : '';
       return `<div class="request-card ${r.status}">
         <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${r.purpose ? r.purpose + ' &middot; ' : ''}${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status ${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span></div>
-        ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}</div>`;
+        ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}${deleteBtn}</div>`;
     }).join('');
 }
 
@@ -613,6 +655,52 @@ function updatePendingBadge() {
 
 function fmtDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+let currentEditingId = null;
+
+function openEditModal(id) {
+  const r = appData.travelRequests.find(r => r.id === id);
+  if (!r) return;
+  currentEditingId = id;
+  document.getElementById('editDestination').value = r.destination || '';
+  document.getElementById('editPurpose').value = r.purpose || '';
+  document.getElementById('editStart').value = r.startDate || '';
+  document.getElementById('editEnd').value = r.endDate || '';
+  document.getElementById('editNotes').value = r.notes || '';
+  document.getElementById('editTravelModal').classList.add('open');
+}
+
+function saveEditedRequest() {
+  const destination = document.getElementById('editDestination').value.trim();
+  const purpose = document.getElementById('editPurpose').value.trim();
+  const startDate = document.getElementById('editStart').value;
+  const endDate = document.getElementById('editEnd').value;
+  const notes = document.getElementById('editNotes').value.trim();
+  if (!destination || !purpose || !startDate || !endDate) { alert('Please fill in all required fields.'); return; }
+  if (endDate < startDate) { alert('End date must be after start date.'); return; }
+
+  const r = appData.travelRequests.find(r => r.id === currentEditingId);
+  if (r) {
+    r.destination = destination;
+    r.purpose = purpose;
+    r.startDate = startDate;
+    r.endDate = endDate;
+    r.notes = notes;
+  }
+  closeModal('editTravelModal');
+  renderTravelRequests();
+  renderCalendar();
+  scheduleSave();
+}
+
+function deleteRequest(id) {
+  if (!confirm('Are you sure you want to delete this travel request?')) return;
+  appData.travelRequests = appData.travelRequests.filter(r => r.id !== id);
+  renderTravelRequests();
+  renderCalendar();
+  renderTeamGrid();
+  scheduleSave();
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
