@@ -133,6 +133,9 @@
   .sync-dot.syncing { background: #f59e0b; animation: pulse 1s infinite; }
   .sync-dot.error { background: #ef4444; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .audit-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.06); color: #6b7280; font-size: 12px; font-weight: 600; user-select: none; transition: box-shadow 0.15s; }
+  .audit-btn:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.12); color: #374151; }
 </style>
 </head>
 <body>
@@ -167,6 +170,15 @@
     </div>
     <div class="section-title">Today's Status</div>
     <div class="team-grid" id="teamGrid"></div>
+    <div style="margin-top:32px; padding-top:20px; border-top:1px solid #e5e7eb; display:flex; align-items:center; justify-content:flex-end;">
+      <div class="audit-btn" onclick="">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+        Audit Trail
+      </div>
+    </div>
   </div>
 
   <div id="tab-calendar" style="display:none">
@@ -229,8 +241,12 @@
       <select id="travelName"><option value="">Select your name</option></select>
     </div>
     <div class="form-group">
-      <label>Destination / Purpose</label>
-      <input type="text" id="travelDestination" placeholder="e.g. Newcastle site visit">
+      <label>Destination</label>
+      <input type="text" id="travelDestination" placeholder="e.g. Newcastle, Ingleburn">
+    </div>
+    <div class="form-group">
+      <label>Purpose</label>
+      <input type="text" id="travelPurpose" placeholder="e.g. Site visit, CRV audit">
     </div>
     <div class="form-group">
       <label>Start Date</label>
@@ -254,7 +270,6 @@
 <script>
 // ---- CONFIG ----
 const API_KEY = '$2a$10$UOAfeo30j3Ovd.oo.1ahLe83LCJlaH614cZ8dUbljzvsXQTfL/dqq';
-const BIN_NAME = 'WHS-Team-Tracker';
 let BIN_ID = '6a0e6e7d6877513b27a83f39';
 
 const TEAM = [
@@ -290,7 +305,6 @@ async function apiFetch(url, method = 'GET', body = null) {
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
 }
-
 
 async function loadRemoteData() {
   const res = await apiFetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`);
@@ -336,9 +350,7 @@ window.onload = async function() {
   });
 
   try {
-    console.log('Fetching from JSONBin...');
     appData = await loadRemoteData();
-    console.log('Loaded:', appData);
     if (!appData.statuses) appData.statuses = {};
     if (!appData.travelRequests) appData.travelRequests = [];
   } catch(e) {
@@ -397,7 +409,6 @@ function renderTeamGrid() {
   const viewAs = getViewingAs();
 
   TEAM.forEach(m => {
-    // Check approved travel first, then manual status, then default
     const travel = (appData.travelRequests || []).find(r =>
       r.memberId === m.id && r.status === 'approved' && todayKey >= r.startDate && todayKey <= r.endDate
     );
@@ -536,20 +547,21 @@ function changeWeek(dir) { calWeekOffset += dir; renderCalendar(); }
 function openTravelModal() {
   const viewAs = getViewingAs();
   if (viewAs) document.getElementById('travelName').value = viewAs;
-  ['travelStart','travelEnd','travelDestination','travelNotes'].forEach(id => document.getElementById(id).value = '');
+  ['travelStart','travelEnd','travelDestination','travelPurpose','travelNotes'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('travelModal').classList.add('open');
 }
 
 function submitTravelRequest() {
   const memberId = document.getElementById('travelName').value;
   const destination = document.getElementById('travelDestination').value.trim();
+  const purpose = document.getElementById('travelPurpose').value.trim();
   const startDate = document.getElementById('travelStart').value;
   const endDate = document.getElementById('travelEnd').value;
   const notes = document.getElementById('travelNotes').value.trim();
-  if (!memberId || !destination || !startDate || !endDate) { alert('Please fill in all required fields.'); return; }
+  if (!memberId || !destination || !purpose || !startDate || !endDate) { alert('Please fill in all required fields.'); return; }
   if (endDate < startDate) { alert('End date must be after start date.'); return; }
 
-  appData.travelRequests.push({ id: Date.now().toString(), memberId, destination, startDate, endDate, notes, status: 'pending', submittedAt: new Date().toISOString() });
+  appData.travelRequests.push({ id: Date.now().toString(), memberId, destination, purpose, startDate, endDate, notes, status: 'pending', submittedAt: new Date().toISOString() });
   closeModal('travelModal');
   renderTravelRequests();
   scheduleSave();
@@ -570,7 +582,7 @@ function renderTravelRequests() {
         ? `<div class="request-actions"><button class="btn btn-success" onclick="resolveRequest('${r.id}','approved')">Approve</button><button class="btn btn-danger" onclick="resolveRequest('${r.id}','rejected')">Reject</button></div>`
         : '<div style="font-size:12px;color:#6b7280;">Awaiting Mark\'s approval</div>';
       return `<div class="request-card pending">
-        <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status pending">Pending</span></div>
+        <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${r.purpose ? r.purpose + ' &middot; ' : ''}${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status pending">Pending</span></div>
         ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}${actions}</div>`;
     }).join('');
 
@@ -579,7 +591,7 @@ function renderTravelRequests() {
     history.map(r => {
       const member = TEAM.find(m => m.id === r.memberId);
       return `<div class="request-card ${r.status}">
-        <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status ${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span></div>
+        <div class="request-header"><div><div class="request-title">${r.destination}</div><div class="request-meta">${r.purpose ? r.purpose + ' &middot; ' : ''}${member ? member.name : r.memberId} &middot; ${fmtDate(r.startDate)} to ${fmtDate(r.endDate)}</div></div><span class="request-status ${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span></div>
         ${r.notes ? `<div class="request-details">${r.notes}</div>` : ''}</div>`;
     }).join('');
 }
