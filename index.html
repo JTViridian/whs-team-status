@@ -300,8 +300,13 @@
 
 <script>
 // ---- CONFIG ----
-const API_KEY = '$2a$10$UOAfeo30j3Ovd.oo.1ahLe83LCJlaH614cZ8dUbljzvsXQTfL/dqq';
-let BIN_ID = '6a0e6e7d6877513b27a83f39';
+const SUPABASE_URL = 'https://zpdqattmoqodzqbhgdei.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZHFhdHRtb3FvZHpxYmhnZGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTU2NjQsImV4cCI6MjA5NTMzMTY2NH0.eO4zw-nQuoDmDEipwQISJW42Ww6cP4EbHkHTziJXRFE';
+const API_HEADERS = {
+  'Content-Type': 'application/json',
+  'apikey': SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`
+};
 
 const TEAM = [
   { id: 'mark',   name: 'Mark Peagam',     role: 'National WHS Manager',          color: '#065f46' },
@@ -321,29 +326,32 @@ let selectedStatus = null;
 let calWeekOffset = 0;
 let saveTimeout = null;
 
-// ---- JSONBIN API ----
-async function apiFetch(url, method = 'GET', body = null) {
-  const opts = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Master-Key': API_KEY,
-      'X-Bin-Versioning': 'false'
-    }
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  return res.json();
-}
-
+// ---- SUPABASE API ----
 async function loadRemoteData() {
-  const res = await apiFetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`);
-  return res.record;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/whs_status?id=eq.main&select=statuses,travel_requests`,
+    { headers: API_HEADERS }
+  );
+  if (!res.ok) throw new Error(`Load error ${res.status}`);
+  const rows = await res.json();
+  if (!rows.length) throw new Error('No data row found');
+  return { statuses: rows[0].statuses, travelRequests: rows[0].travel_requests };
 }
 
 async function saveRemoteData(data) {
-  await apiFetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, 'PUT', data);
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/whs_status?id=eq.main`,
+    {
+      method: 'PATCH',
+      headers: { ...API_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        statuses: data.statuses,
+        travel_requests: data.travelRequests,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+  if (!res.ok) throw new Error(`Save error ${res.status}`);
 }
 
 // ---- SYNC HELPERS ----
@@ -390,7 +398,7 @@ window.onload = async function() {
       <div style="text-align:center;padding:24px;">
         <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
         <h2 style="margin-bottom:8px;">Could not connect</h2>
-        <p style="opacity:0.8;max-width:320px;">Could not reach JSONBin. Check your internet connection and refresh.</p>
+        <p style="opacity:0.8;max-width:320px;">Could not reach the database. Check your internet connection and refresh.</p>
         <button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:white;color:#1a3c5e;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Retry</button>
       </div>`;
     return;
